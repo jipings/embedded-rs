@@ -5,9 +5,10 @@
 use cortex_m_rt::entry;
 use embedded_hal::blocking::serial;
 use microbit::hal::Timer;
-use rtt_target::rtt_init_print;
+use rtt_target::{rtt_init_print, rprintln};
 use panic_halt as _;
 use core::fmt::Write;
+use heapless::Vec;
 
 #[cfg(feature = "v2")]
 use microbit::{
@@ -36,12 +37,22 @@ fn main () -> ! {
         UartePort::new(serial)
     };
 
-    let mut _timer = Timer::new(board.TIMER0);
-    
-    write!(serial, "The quick brown fox jumps over the lazy dog. \r\n").unwrap();
-    nb::block!(serial.flush()).unwrap();
+    let mut buffer: Vec<u8, 32> = Vec::new();
 
     loop {
+        let byte = nb::block!(serial.read()).unwrap();
+        if byte == 13 {
+            for byte in buffer.iter().rev().chain(&[b'\n', b'\r']) {
+                nb::block!(serial.write(*byte)).unwrap();
+                nb::block!(serial.flush()).unwrap()
+            }
+            buffer.clear();
+        } else {
+            if buffer.push(byte).is_err() {
+                write!(serial, "error: buffer full\r\n").unwrap();
+                buffer.clear();
+            };
+        }
     }
 }
 
