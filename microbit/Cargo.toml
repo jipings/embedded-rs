@@ -22,6 +22,7 @@ panic-rtt-target = { version = "0.1.2", features = ["cortex-m"] }
 nb = "1.0.0"
 heapless = "0.7.10"
 embedded-hal = "0.2.6"
+lsm303agr = "0.2.2"
 
 [dev-dependencies]
 # Sneak in dependencies for examples which clash with panic-hal when generating
