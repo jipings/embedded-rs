@@ -1,45 +1,47 @@
 
 #![no_std]
 #![no_main]
-#![deny(unsafe_code)]
 
 use cortex_m_rt::entry;
+use embedded_hal::blocking::serial;
+use microbit::hal::Timer;
 use rtt_target::rtt_init_print;
 use panic_halt as _;
+use core::fmt::Write;
+
+#[cfg(feature = "v2")]
 use microbit::{
-    board::Board,
-    display::blocking::Display,
-    hal::Timer,
+    hal::prelude::*,
+    hal::uarte,
+    hal::uarte::{Baudrate, Parity},
 };
 
-const PIXELS: [(usize, usize); 16] = [
-    (0,0), (0,1), (0,2), (0,3), (0,4), (1,4), (2,4), (3,4), (4,4),
-    (4,3), (4,2), (4,1), (4,0), (3,0), (2,0), (1,0)
-];
+#[cfg(feature = "v2")]
+mod serial_setup;
+#[cfg(feature = "v2")]
+use serial_setup::UartePort;
 
 #[entry]
 fn main () -> ! {
     rtt_init_print!();
-    let board = Board::take().unwrap();
-    let mut timer = Timer::new(board.TIMER0);
-    let mut display = Display::new(board.display_pins);
+    let board = microbit::Board::take().unwrap();
+    
+    let mut serial = {
+        let serial = uarte::Uarte::new(
+            board.UARTE0,
+            board.uart.into(),
+            Parity::EXCLUDED,
+            Baudrate::BAUD115200,
+        );
+        UartePort::new(serial)
+    };
 
-    let mut leds = [
-        [0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0],
-    ];
+    let mut _timer = Timer::new(board.TIMER0);
+    
+    write!(serial, "The quick brown fox jumps over the lazy dog. \r\n").unwrap();
+    nb::block!(serial.flush()).unwrap();
 
-    let mut last_led = (0, 0);
     loop {
-        for current_led in PIXELS.iter() {
-            leds[last_led.0][last_led.1] = 0;
-            leds[current_led.0][current_led.1] = 1;
-            display.show(&mut timer, leds, 300);
-            last_led = *current_led;
-        }
     }
 }
 
